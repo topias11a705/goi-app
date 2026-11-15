@@ -71,6 +71,11 @@ details.uk[open] summary .m{white-space:normal}
 .empty{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:28px 16px;text-align:center;margin-top:10px}
 .toast{position:fixed;left:50%;bottom:calc(110px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#222;color:#fff;padding:8px 14px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
 .toast.show{opacity:.92}
+.exp{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px;margin-top:8px}
+.exp .eh{display:flex;gap:6px;align-items:baseline}
+.exp .seg{display:flex;gap:14px;margin:8px 0;font-size:14px}.exp .seg label{display:flex;align-items:center;gap:4px}
+.exp .seg input{width:18px;height:18px;accent-color:var(--ac)}
+.exp .eb{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px}.exp .eb button{padding:9px 4px;font-size:13px;font-weight:700}
 </style></head><body><div class="wrap">
 <h1>デイリー語彙力 単語帳</h1>
 <div class="stats"><div class="stat"><b id="sAll"></b><span>対象</span></div><div class="stat"><b id="sK"></b><span>知ってる</span></div><div class="stat"><b id="sU"></b><span>知らない</span></div><div class="stat"><b id="sN"></b><span>未仕分け</span></div></div>
@@ -217,15 +222,42 @@ function bulkBar(){
  const ap=v=>{const c=selSet.size;selSet.forEach(w=>setSt(w,v));save();selSet.clear();stats(pool());listBody();toast(c+'件を'+(v==='k'?'知ってる':v==='u'?'知らない':'未仕分け')+'にしました')};
  $('bk2').onclick=()=>ap('k');$('bu2').onclick=()=>ap('u');$('bn2').onclick=()=>ap('');
 }
+/* ---------- 出力 ---------- */
+let escope='all',_ukVis=[];
+function expList(){return escope==='vis'?_ukVis:W.filter(x=>st[x.w]==='u')}
+function expCount(){const e=$('ecnt');if(e)e.textContent='（'+expList().length+'語）'}
+const vurl=x=>'https://www.youtube.com/watch?v='+V[x.vol];
+function csvOf(L){const q=v=>{v=String(v);return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+ return '\ufeff'+[['vol','語彙','読み方','意味','用例1','用例2','動画URL']].concat(L.map(x=>[x.vol,x.w,x.r,x.m,x.ex[0]||'',x.ex[1]||'',vurl(x)])).map(r=>r.map(q).join(',')).join('\r\n')+'\r\n'}
+function txtOf(L){return '【知らない語 '+L.length+'語】\n\n'+L.map(x=>x.w+'（'+x.r+'）'+x.m+'\n'+x.ex.map(e=>'・'+e).join('\n')).join('\n\n')+'\n'}
+function fname(){const d=new Date(),p=n=>String(n).padStart(2,'0');return '知らない語_'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'.csv'}
+function dlBlob(b,n){const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=n;a.rel='noopener';document.body.appendChild(a);a.click();
+ setTimeout(()=>{a.remove();URL.revokeObjectURL(u)},4000)}
+async function copyText(t){try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(t);return true}}catch(e){}
+ try{const ta=document.createElement('textarea');ta.value=t;ta.setAttribute('readonly','');ta.style.cssText='position:fixed;top:0;left:0;opacity:0;font-size:16px';document.body.appendChild(ta);
+  ta.focus();ta.select();ta.setSelectionRange(0,t.length);const ok=document.execCommand('copy');ta.remove();return ok}catch(e){return false}}
 /* ---------- 知らない一覧 ---------- */
 function renderUnk(P){
  const M=$('main');
- M.innerHTML='<div class="ctl"><input class="full" type="search" id="uq" placeholder="知らない語を検索（語・読み・意味・用例）" value="'+esc(uq)+'"></div><div id="ures"></div>';
+ M.innerHTML='<div class="ctl"><input class="full" type="search" id="uq" placeholder="知らない語を検索（語・読み・意味・用例）" value="'+esc(uq)+'"></div>'+
+ '<div class="exp" id="exp"><div class="eh"><b>出力</b><span class="sub" id="ecnt"></span></div>'+
+ '<div class="seg"><label><input type="radio" name="esc" value="all" '+(escope==='all'?'checked':'')+'>すべての知らない語</label><label><input type="radio" name="esc" value="vis" '+(escope==='vis'?'checked':'')+'>表示中のみ</label></div>'+
+ '<div class="eb"><button id="ecsv">CSVダウンロード</button><button id="etxt">テキストをコピー</button><button id="eshr">共有</button></div></div><div id="ures"></div>';
  $('uq').oninput=e=>{uq=e.target.value;up=0;unkBody()};
+ document.querySelectorAll('input[name=esc]').forEach(r=>r.onchange=()=>{escope=r.value;expCount()});
+ $('ecsv').onclick=()=>{const L=expList();if(!L.length)return toast('出力する語がありません');dlBlob(new Blob([csvOf(L)],{type:'text/csv;charset=utf-8'}),fname());toast(L.length+'語をCSVで出力しました')};
+ $('etxt').onclick=()=>{const L=expList();if(!L.length)return toast('出力する語がありません');copyText(txtOf(L)).then(ok=>toast(ok?L.length+'語をコピーしました':'コピーできませんでした'))};
+ if(!navigator.share)$('eshr').style.display='none';
+ $('eshr').onclick=async()=>{const L=expList();if(!L.length)return toast('出力する語がありません');
+  try{const f=typeof File!=='undefined'?new File([csvOf(L)],fname(),{type:'text/csv'}):null;
+   if(f&&navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:'知らない語（'+L.length+'語）'});
+   else await navigator.share({title:'知らない語（'+L.length+'語）',text:txtOf(L)});
+  }catch(e){if(e&&e.name!=='AbortError'){try{await navigator.share({title:'知らない語',text:txtOf(L)})}catch(_){toast('共有できませんでした')}}}};
  unkBody();
 }
 function unkBody(){
  const q=uq.trim();const U=pool().filter(x=>st[x.w]==='u'&&(!q||x.w.includes(q)||x.r.includes(q)||x.m.includes(q)||x.ex.some(e=>e.includes(q))));
+ _ukVis=U;expCount();
  const n=U.length,pages=Math.max(1,Math.ceil(n/PER));if(up>=pages)up=pages-1;
  const R=$('ures');
  if(!n){R.innerHTML='<div class="empty">'+(q?'該当する知らない語はありません。':'知らない語はまだありません。「仕分け」や「一覧」で知らないに分けた語がここに出ます。')+'</div>';return}
