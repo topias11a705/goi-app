@@ -28,8 +28,8 @@ select,input[type=search]{font:inherit;font-size:16px;padding:8px;border-radius:
 .word{font-size:38px;font-weight:700;margin:12px 0;word-break:break-all}
 .det{text-align:left;margin-top:12px;line-height:1.7}
 .badge{position:absolute;top:14px;padding:4px 10px;border-radius:8px;font-weight:800;font-size:18px;border:3px solid;opacity:0;pointer-events:none}
-.badge.k{left:14px;color:var(--ok);border-color:var(--ok);transform:rotate(-12deg)}
-.badge.u{right:14px;color:var(--ng);border-color:var(--ng);transform:rotate(12deg)}
+.badge.k{left:50%;color:var(--ok);border-color:var(--ok);transform:translateX(-50%) rotate(-10deg)}
+.badge.u{left:50%;color:var(--ng);border-color:var(--ng);transform:translateX(-50%) rotate(10deg)}
 .cur{display:inline-block;margin-top:4px;font-size:12px;padding:2px 8px;border-radius:6px}
 .cur.k{background:var(--okbg);color:var(--ok)}.cur.u{background:var(--ngbg);color:var(--ng)}
 .ans{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
@@ -156,9 +156,9 @@ function renderSort(P){
  M.innerHTML='<div class="stage"><div class="card" id="card"><div class="badge k" id="bgk">知ってる</div><div class="badge u" id="bgu">知らない</div>'+
  '<div class="sub">'+pad(x.vol)+'・残り '+rem+' 語</div>'+(s?'<div class="cur '+s+'">現在：'+(s==='k'?'知ってる':'知らない')+'</div>':'')+
  '<div class="word">'+esc(x.w)+'</div>'+(reveal?'<div class="sub" style="font-size:15px">'+esc(x.r)+'</div>'+det(x):'<div class="sub">タップで答えを見る</div>')+
- '<div class="ans"><button id="bu" class="'+(s==='u'?'selu':'')+'">← 知らない</button><button id="bk" class="'+(s==='k'?'selk':'')+'">知ってる →</button></div>'+
+ '<div class="ans"><button id="bk" class="'+(s==='k'?'selk':'')+'">← 知ってる</button><button id="bu" class="'+(s==='u'?'selu':'')+'">知らない →</button></div>'+
  '<div class="row">'+(hist.length?'<button id="ud" class="sbtn">ひとつ戻す</button>':'')+'</div></div></div>'+
- '<div class="hint">右スワイプ＝知ってる／左スワイプ＝知らない'+(matchMedia('(pointer:fine)').matches?'（← → キー、↓/スペースで答え、Zで戻す）':'')+'</div>';
+ '<div class="hint">← 左スワイプ＝知ってる／右スワイプ＝知らない →'+(matchMedia('(pointer:fine)').matches?'（←キー＝知ってる・→キー＝知らない、↓/スペースで答え、Zで戻す）':'')+'</div>';
  $('bk').onclick=e=>{e.stopPropagation();commit(x,'k',false)};
  $('bu').onclick=e=>{e.stopPropagation();commit(x,'u',false)};
  if(hist.length)$('ud').onclick=e=>{e.stopPropagation();undo()};
@@ -168,7 +168,7 @@ function commit(x,v,swiped,dx){
  if(busy)return;busy=true;
  const c=$('card');$(v==='k'?'bk':'bu').className='sel'+v;$(v==='k'?'bu':'bk').className='';
  setSt(x.w,v);save();hist.push(x.w);if(hist.length>500)hist.shift();cur=null;reveal=false;
- const dir=v==='k'?1:-1;
+ const dir=v==='k'?-1:1;
  c.classList.add('anim');
  setTimeout(()=>{c.style.transform='translateX('+(dir*window.innerWidth)+'px) rotate('+(dir*18)+'deg)';c.style.opacity='0'},swiped?0:110);
  setTimeout(()=>render(),swiped?170:280);
@@ -181,14 +181,14 @@ function attachSwipe(c,x){
  c.addEventListener('pointermove',e=>{if(!down||e.pointerId!==pid)return;dx=e.clientX-sx;const dy=e.clientY-sy;
   if(!drag){if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)*1.2){drag=true;try{c.setPointerCapture(pid)}catch(_){}}else if(Math.abs(dy)>12){down=false;return}else return}
   e.preventDefault();c.style.transform='translateX('+dx+'px) rotate('+(dx/18)+'deg)';
-  const p=Math.min(1,Math.abs(dx)/TH);bk.style.opacity=dx>0?p:0;bu.style.opacity=dx<0?p:0;
-  c.style.boxShadow=dx>0?'0 0 0 3px rgba(22,163,74,'+p*.6+')':'0 0 0 3px rgba(220,104,3,'+p*.6+')';
-  $('bk').className=dx>TH?'selk':(st[x.w]==='k'?'selk':'');$('bu').className=dx<-TH?'selu':(st[x.w]==='u'?'selu':'');
+  const p=Math.min(1,Math.abs(dx)/TH);bk.style.opacity=dx<0?p:0;bu.style.opacity=dx>0?p:0;
+  c.style.boxShadow=dx<0?'0 0 0 3px rgba(22,163,74,'+p*.6+')':'0 0 0 3px rgba(220,104,3,'+p*.6+')';
+  $('bk').className=dx<-TH?'selk':(st[x.w]==='k'?'selk':'');$('bu').className=dx>TH?'selu':(st[x.w]==='u'?'selu':'');
  },{passive:false});
  const end=e=>{if(!down)return;down=false;
   if(!drag){return}
   drag=false;c._sw=Date.now();
-  if(Math.abs(dx)>=TH){commit(x,dx>0?'k':'u',true,dx)}
+  if(Math.abs(dx)>=TH){commit(x,dx<0?'k':'u',true,dx)}
   else{c.classList.add('anim');c.style.transform='';c.style.boxShadow='';bk.style.opacity=0;bu.style.opacity=0;
    $('bk').className=st[x.w]==='k'?'selk':'';$('bu').className=st[x.w]==='u'?'selu':'';setTimeout(()=>c.classList.remove('anim'),200)}};
  c.addEventListener('pointerup',end);c.addEventListener('pointercancel',end);
@@ -197,8 +197,8 @@ function attachSwipe(c,x){
 document.addEventListener('keydown',e=>{
  if(mode!=='sort'||e.target.matches('input,select,textarea'))return;
  const x=nextWord(pool());if(!x)return;
- if(e.key==='ArrowRight'){e.preventDefault();commit(x,'k',false)}
- else if(e.key==='ArrowLeft'){e.preventDefault();commit(x,'u',false)}
+ if(e.key==='ArrowLeft'){e.preventDefault();commit(x,'k',false)}
+ else if(e.key==='ArrowRight'){e.preventDefault();commit(x,'u',false)}
  else if(e.key==='ArrowDown'||e.key===' '){e.preventDefault();if(!reveal){reveal=true;render()}}
  else if(e.key==='z'||e.key==='Backspace'){e.preventDefault();undo()}
 });
@@ -207,7 +207,7 @@ function renderFocus(P){
  const U=P.filter(x=>st[x.w]==='u');const M=$('main');
  if(!U.length){M.innerHTML='<div class="empty">知らない語はありません。「仕分け」で知らないに分けた語がここに出ます。</div>';return}
  const i=fi%U.length,x=U[i];
- M.innerHTML='<div class="card" id="fc"><div class="sub">知らない語 '+(i+1)+' / '+U.length+'・'+pad(x.vol)+'</div><div class="word">'+esc(x.w)+'</div>'+(reveal?'<div class="sub" style="font-size:15px">'+esc(x.r)+'</div>'+det(x):'<div class="sub">タップで読み方・意味・用例を表示</div>')+'<div class="ans"><button id="nx">次へ</button><button id="lk">覚えた（知ってるへ）</button></div></div>';
+ M.innerHTML='<div class="card" id="fc"><div class="sub">知らない語 '+(i+1)+' / '+U.length+'・'+pad(x.vol)+'</div><div class="word">'+esc(x.w)+'</div>'+(reveal?'<div class="sub" style="font-size:15px">'+esc(x.r)+'</div>'+det(x):'<div class="sub">タップで読み方・意味・用例を表示</div>')+'<div class="ans"><button id="lk">← 覚えた（知ってるへ）</button><button id="nx">次へ →</button></div></div>';
  $('fc').onclick=e=>{if(!e.target.closest('button,a')){reveal=true;render()}};
  $('lk').onclick=()=>{$('lk').className='selk';setSt(x.w,'k');save();reveal=false;setTimeout(render,150)};
  $('nx').onclick=()=>{fi++;reveal=false;render()};
