@@ -69,8 +69,18 @@ details.uk summary .m{font-size:12px;color:var(--sub);flex:1;min-width:0;white-s
 details.uk .body{padding:0 12px 12px;line-height:1.7;font-size:14px}
 details.uk[open] summary .m{white-space:normal}
 .empty{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:28px 16px;text-align:center;margin-top:10px}
-.toast{position:fixed;left:50%;bottom:calc(110px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#222;color:#fff;padding:8px 14px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
-.toast.show{opacity:.92}
+.toast{position:fixed;left:50%;bottom:calc(110px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#222;color:#fff;padding:8px 14px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;display:flex;align-items:center;gap:12px;max-width:92vw}
+.toast.show{opacity:.95}.toast.act{pointer-events:auto}
+.toast button{background:none;border:0;color:#93c5fd;font-weight:700;padding:4px 2px;font-size:14px;white-space:nowrap}
+.dz{text-align:center;margin-top:48px;padding-top:16px;border-top:1px dashed var(--bd)}
+.dz button{background:none;border:0;color:var(--sub);font-size:12px;text-decoration:underline;padding:6px}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:30;display:flex;align-items:center;justify-content:center;padding:16px}
+.dlg{background:var(--card);color:var(--tx);border-radius:16px;padding:18px;width:100%;max-width:400px;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.dlg h2{font-size:17px;margin:0 0 8px}.dlg p{margin:6px 0;font-size:14px;line-height:1.6}
+.dlg input{font:inherit;font-size:16px;width:100%;padding:10px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);margin-top:6px}
+.dlg .db{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.dlg .db button{padding:12px;font-weight:700}
+.dlg .danger{background:#dc2626;border-color:#dc2626;color:#fff}.dlg .pri2{background:var(--ac);border-color:var(--ac);color:#fff}
 .exp{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px;margin-top:8px}
 .exp .eh{display:flex;gap:6px;align-items:baseline}
 .exp .seg{display:flex;gap:14px;margin:8px 0;font-size:14px}.exp .seg label{display:flex;align-items:center;gap:4px}
@@ -82,8 +92,8 @@ details.uk[open] summary .m{white-space:normal}
 <select id="vol" aria-label="動画で絞り込み"></select>
 <div class="tabs"><button data-m="sort">仕分け</button><button data-m="focus">集中学習</button><button data-m="list">一覧</button><button data-m="unk">知らない一覧</button></div>
 <div id="main"></div>
-<div class="row"><button id="reset" class="sbtn">この範囲の仕分けをリセット</button></div>
 <p class="sub">再生リスト「デイリー語彙力：デイリー20」全298本。語彙は各動画の概要欄【今日の語彙】から抽出。読み方・意味・用例はすべて字幕を使わず新たに書き下ろしたものです（全5,960語・用例各2文）。進捗はこの端末のブラウザに保存されます。</p>
+<div class="dz"><button id="reset">この範囲の仕分けをリセット…</button></div>
 </div>
 <div id="bulk" class="bulk" style="display:none"></div>
 <div id="toast" class="toast"></div>
@@ -103,12 +113,30 @@ const BYW=new Map(W.map(x=>[x.w,x]));
 function save(){try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}}
 function setSt(w,v){if(v)st[w]=v;else delete st[w]}
 function pool(){return vol==='all'?W:W.filter(x=>String(x.vol)===vol)}
-let tt;function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('show'),1400)}
+let tt;function toast(t,undoFn){const e=$('toast');e.innerHTML='';const sp=document.createElement('span');sp.textContent=t;e.appendChild(sp);
+ e.classList.toggle('act',!!undoFn);
+ if(undoFn){const b=document.createElement('button');b.id='tundo';b.textContent='元に戻す';b.onclick=()=>{clearTimeout(tt);e.classList.remove('show','act');undoFn()};e.appendChild(b)}
+ e.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('show','act'),undoFn?10000:1400)}
+function snap(ws){const m=new Map();ws.forEach(w=>m.set(w,st[w]||''));return m}
+function restore(m){m.forEach((v,w)=>setSt(w,v));save();render();toast('元に戻しました')}
+function modal(o){return new Promise(res=>{const ov=document.createElement('div');ov.className='ov';
+ ov.innerHTML='<div class="dlg" role="dialog" aria-modal="true"><h2>'+o.title+'</h2>'+o.body+(o.typeWord?'<p class="sub">確認のため「'+o.typeWord+'」と入力してください。</p><input id="mty" autocomplete="off" autocapitalize="off" placeholder="'+o.typeWord+'">':'')+
+ '<div class="db"><button id="mcn">キャンセル</button><button id="mok" class="'+(o.danger?'danger':'pri2')+'" '+(o.typeWord?'disabled':'')+'>'+o.ok+'</button></div></div>';
+ document.body.appendChild(ov);const ok=ov.querySelector('#mok'),cn=ov.querySelector('#mcn'),ty=ov.querySelector('#mty');
+ const done=v=>{document.removeEventListener('keydown',kd,true);ov.remove();res(v)};
+ const kd=e=>{if(e.key==='Escape'){e.preventDefault();done(false)}else if(e.key==='Enter'&&!ok.disabled&&document.activeElement===ty){e.preventDefault();done(true)}e.stopPropagation()};
+ document.addEventListener('keydown',kd,true);
+ if(ty)ty.oninput=()=>{ok.disabled=ty.value.trim()!==o.typeWord};
+ cn.onclick=()=>done(false);ok.onclick=()=>{if(!ok.disabled)done(true)};ov.onclick=e=>{if(e.target===ov)done(false)};
+ cn.focus()})}
 const sel=$('vol');
 sel.innerHTML='<option value="all">すべての動画（'+W.length+'語）</option>'+[...new Set(W.map(x=>x.vol))].map(v=>'<option value="'+v+'">'+pad(v)+'</option>').join('');
 sel.onchange=()=>{vol=sel.value;fi=0;reveal=false;cur=null;lp=0;up=0;selSet.clear();render()};
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{mode=b.dataset.m;fi=0;reveal=false;cur=null;render()});
-$('reset').onclick=()=>{if(!confirm('この範囲の仕分けをリセットしますか？'))return;pool().forEach(x=>delete st[x.w]);save();hist=[];cur=null;render()};
+$('reset').onclick=async()=>{const P=pool();const M=P.filter(x=>st[x.w]);if(!M.length){toast('この範囲にリセットする印はありません');return}
+ const k=M.filter(x=>st[x.w]==='k').length,u=M.length-k,rng=vol==='all'?'すべての動画（全'+P.length+'語）':pad(+vol)+'（'+P.length+'語）';
+ const okk=await modal({title:'仕分けをリセットしますか？',danger:true,ok:'リセットする',typeWord:'リセット',body:'<p>範囲：<b>'+rng+'</b></p><p><b>'+M.length+'件</b>の印が消えます（知ってる '+k+'・知らない '+u+'）。</p>'});
+ if(!okk)return;const sn=snap(M.map(x=>x.w));M.forEach(x=>delete st[x.w]);save();hist=[];cur=null;render();toast(M.length+'件の印をリセットしました',()=>restore(sn))};
 function stats(P){let k=0,u=0;for(const x of P){const s=st[x.w];if(s==='k')k++;else if(s==='u')u++}
  $('sAll').textContent=P.length;$('sK').textContent=k;$('sU').textContent=u;$('sN').textContent=P.length-k-u}
 function det(x){return '<div class="det"><div><b>意味</b>：'+esc(x.m)+'</div>'+x.ex.map((e,i)=>'<div class="sub">用例'+(i+1)+'：'+esc(e)+'</div>').join('')+'<div class="sub">出典：<a target="_blank" rel="noopener" href="https://www.youtube.com/watch?v='+V[x.vol]+'">'+pad(x.vol)+'</a></div></div>'}
@@ -219,7 +247,13 @@ function bulkBar(){
  const B=$('bulk');if(mode!=='list'){B.style.display='none';return}
  const n=selSet.size;B.style.display='block';
  B.innerHTML='<div class="in"><div class="sub">'+n+' 件選択中'+(n?'':'（チェックボックスで選択）')+'</div><div class="bt"><button class="k" id="bk2" '+(n?'':'disabled')+'>まとめて知ってる</button><button class="u" id="bu2" '+(n?'':'disabled')+'>まとめて知らない</button><button id="bn2" '+(n?'':'disabled')+'>未仕分けに戻す</button></div></div>';
- const ap=v=>{const c=selSet.size;selSet.forEach(w=>setSt(w,v));save();selSet.clear();stats(pool());listBody();toast(c+'件を'+(v==='k'?'知ってる':v==='u'?'知らない':'未仕分け')+'にしました')};
+ const lab=v=>v==='k'?'知ってる':v==='u'?'知らない':'未仕分け';
+ const ap=async v=>{const ws=[...selSet],c=ws.length;
+  if(v===''){const m=ws.filter(w=>st[w]).length;if(!m){toast('選択した語はすでに未仕分けです');return}
+   if(!await modal({title:'未仕分けに戻しますか？',danger:true,ok:'戻す',body:'<p>選択中 '+c+'件のうち <b>'+m+'件</b>の印（知ってる／知らない）が消えます。</p>'}))return}
+  else{const o=ws.filter(w=>st[w]&&st[w]!==v).length;
+   if(o&&!await modal({title:'既存の印を上書きしますか？',ok:'上書きする',body:'<p>選択中 '+c+'件を「'+lab(v)+'」にします。</p><p>うち <b>'+o+'件</b>はすでに「'+lab(v==='k'?'u':'k')+'」の印があり、上書きされます。</p>'}))return}
+  const sn=snap(ws);ws.forEach(w=>setSt(w,v));save();selSet.clear();stats(pool());listBody();toast(c+'件を'+lab(v)+'にしました',()=>restore(sn))};
  $('bk2').onclick=()=>ap('k');$('bu2').onclick=()=>ap('u');$('bn2').onclick=()=>ap('');
 }
 /* ---------- 出力 ---------- */
